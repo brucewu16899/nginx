@@ -1,0 +1,191 @@
+- hosts: ffmpeg
+  # user: azureuser
+  remote_user: azureuser
+  vars: 
+      masterfolder: '/usr/src/ffmpeg_sources'
+
+
+  tasks:
+    - name: Update apt cache
+      apt: update_cache=yes
+      sudo: yes
+
+    - name: Install required packages
+      apt: name={{ item }}
+      sudo: yes
+      with_items:
+        - autoconf
+        - automake
+        - build-essential
+        - libass-dev
+        - libfreetype6-dev
+        - libsdl1.2-dev
+        - libtheora-dev
+        - libtool
+        - libva-dev
+        - libvdpau-dev
+        - libvorbis-dev
+        - libxcb1-dev
+        - libxcb-shm0-dev
+        - libxcb-xfixes0-dev
+        - pkg-config
+        - texinfo
+        - zlib1g-dev
+        - checkinstall
+        - yasm
+        - mercurial
+        - cmake
+        - nasm
+        - unzip
+
+    - name: Creating master folder
+      sudo: yes
+      file: path={{ masterfolder }} state=directory mode=0777
+    
+# x264
+    - name: get source x264
+      get_url: url=http://download.videolan.org/pub/x264/snapshots/last_x264.tar.bz2 dest={{ masterfolder }}/last_x264.tar.bz2
+
+    - name: unarchive x264
+      sudo: yes
+      unarchive: src={{ masterfolder }}/last_x264.tar.bz2 dest={{ masterfolder }} copy=no
+
+    - name: move x264-snapshot* to x264
+      shell: mv {{ masterfolder }}/x264-snapshot* {{ masterfolder }}/x264
+
+    - name: Build x264
+      sudo: yes
+      shell: "{{ item }}"
+      args:
+         chdir: "{{ masterfolder }}/x264"
+      with_items:
+          - ./configure --enable-static
+          - make -j8
+          - checkinstall --pkgname=x264 --pkgversion="1.$(date +%Y%m%d%H%M)-tarbz2" --backup=no --deldoc=yes --fstrans=no --default
+#          - make distclean
+
+# x265
+    - name: get source x265
+      hg: repo=https://bitbucket.org/multicoreware/x265 dest={{ masterfolder }}/x265 #revision=stable purge=yes
+
+    - name: Build x265
+      sudo: yes
+      shell: "{{ item }}"
+      args:
+         chdir: "{{ masterfolder }}/x265/build/linux"
+      with_items:
+          - cmake -G "Unix Makefiles" -DENABLE_SHARED:bool=off ../../source
+          - make -j8
+          - checkinstall --pkgname=x265 --pkgversion="1.$(date +%Y%m%d%H%M)-git" --backup=no --deldoc=yes --fstrans=no --default
+#          - make distclean
+
+# fdk-aac
+    - name: get source fdk-aac
+      shell: cd {{ masterfolder }} && wget -O fdk-aac.tar.gz https://github.com/mstorsjo/fdk-aac/tarball/master
+
+    - name: unarchive fdk-aac
+      sudo: yes
+      unarchive: src={{ masterfolder }}/fdk-aac.tar.gz dest={{ masterfolder }} copy=no
+
+    - name: move mstorsjo* to fdk-aac
+      shell: mv {{ masterfolder }}/mstorsjo* {{ masterfolder }}/fdk-aac
+
+    - name: Build fdk-aac
+      sudo: yes
+      shell: "{{ item }}"
+      args:
+         chdir: "{{ masterfolder }}/fdk-aac"
+      with_items:
+          - autoreconf -fiv
+          - ./configure --disable-shared
+          - make -j8
+          - checkinstall --pkgname=fdk-aac --pkgversion="1.$(date +%Y%m%d%H%M)-git" --backup=no --deldoc=yes --fstrans=no --default
+#          - make distclean
+
+# lame
+    - name: get source lame
+      get_url: url=http://downloads.sourceforge.net/project/lame/lame/3.99/lame-3.99.5.tar.gz dest={{ masterfolder }}/lame-3.99.5.tar.gz
+
+    - name: unarchive lame
+      sudo: yes
+      unarchive: src={{ masterfolder }}/lame-3.99.5.tar.gz dest={{ masterfolder }} copy=no
+
+    - name: Build lame
+      sudo: yes
+      shell: "{{ item }}"
+      args:
+         chdir: "{{ masterfolder }}/lame-3.99.5"
+      with_items:
+          - ./configure --enable-nasm --disable-shared
+          - make -j8
+          - checkinstall --pkgname=lame --pkgversion="1.$(date +%Y%m%d%H%M)-tarbz2" --backup=no --deldoc=yes --fstrans=no --default
+#          - make distclean
+
+# opus
+    - name: get source opus
+      get_url: url=http://downloads.xiph.org/releases/opus/opus-1.1.tar.gz dest={{ masterfolder }}/opus-1.1.tar.gz
+
+    - name: unarchive opus
+      sudo: yes
+      unarchive: src={{ masterfolder }}/opus-1.1.tar.gz dest={{ masterfolder }} copy=no
+
+    - name: Build opus
+      sudo: yes
+      shell: "{{ item }}"
+      args:
+         chdir: "{{ masterfolder }}/opus-1.1"
+      with_items:
+          - ./configure --disable-shared
+          - make -j8
+          - checkinstall --pkgname=opus --pkgversion="1.$(date +%Y%m%d%H%M)-targz" --backup=no --deldoc=yes --fstrans=no --default
+#          - make distclean
+
+# libvpx
+    - name: get source libvpx
+      get_url: url=http://storage.googleapis.com/downloads.webmproject.org/releases/webm/libvpx-1.5.0.tar.bz2 dest={{ masterfolder }}/libvpx-1.5.0.tar.bz2
+
+    - name: unarchive libvpx
+      sudo: yes
+      unarchive: src={{ masterfolder }}/libvpx-1.5.0.tar.bz2 dest={{ masterfolder }} copy=no
+
+    - name: Build libvpx
+      sudo: yes
+      shell: "{{ item }}"
+      args:
+         chdir: "{{ masterfolder }}/libvpx-1.5.0"
+      with_items:
+          - ./configure --disable-examples --disable-unit-tests
+          - make -j8
+          - checkinstall --pkgname=libvpx --pkgversion="1.$(date +%Y%m%d%H%M)-targz" --backup=no --deldoc=yes --fstrans=no --default
+#          - make distclean
+
+# ffmpeg
+    - name: get source ffmpeg
+      get_url: url=http://ffmpeg.org/releases/ffmpeg-snapshot.tar.bz2 dest={{ masterfolder }}/ffmpeg-snapshot.tar.bz2
+
+    - name: unarchive ffmpeg
+      sudo: yes
+      unarchive: src={{ masterfolder }}/ffmpeg-snapshot.tar.bz2 dest={{ masterfolder }} copy=no
+
+    - name: Build ffmpeg
+      sudo: yes
+      shell: "{{ item }}"
+      args:
+         chdir: "{{ masterfolder }}/ffmpeg"
+      with_items:
+          - ./configure --pkg-config-flags="--static" --enable-gpl --enable-libass --enable-libfdk-aac --enable-libfreetype --enable-libmp3lame --enable-libtheora --enable-libvorbis --enable-libvpx --enable-libx264 --enable-nonfree --enable-filter=movie --enable-filter=drawtext --enable-libfreetype --enable-filter=overlay --enable-filter=yadif
+          - make -j8
+          - checkinstall --pkgname=ffmpeg --pkgversion="1.$(date +%Y%m%d%H%M)-targz" --backup=no --deldoc=yes --fstrans=no --default
+#          - make distclean
+#notify: Restart Redis
+
+
+
+
+
+
+
+
+
+
+

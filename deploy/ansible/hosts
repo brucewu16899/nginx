@@ -1,0 +1,7 @@
+[test]
+localhost ansible_connection=local
+
+
+[ffmpeg]
+nginxtest-c5h62c6g.cloudapp.net ansible_user=azureuser ansible_ssh_pass=sdgfryq345jgh
+

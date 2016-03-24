@@ -1,0 +1,109 @@
+- hosts: ffmpeg
+  # user: azureuser
+  remote_user: azureuser
+  vars: 
+      masterfolder: '/usr/src/nginxrtmp'
+      ngxver: '1.9.9'
+
+
+  tasks:
+    - name: Update apt cache
+      apt: update_cache=yes
+      sudo: yes
+
+    - name: Install required packages
+      apt: name={{ item }}
+      sudo: yes
+      with_items:
+        - libxml2-dev
+        - libbz2-dev
+        - libcurl4-openssl-dev
+        - libmcrypt-dev
+        - libmhash2
+        - libmhash-dev
+        - libpcre3
+        - libpcre3-dev
+        - make
+        - build-essential
+        - libxslt1-dev
+        - git
+        - unzip
+        - libgd2-xpm-dev
+        - libgeoip-dev
+        - libpam-dev
+        - libgoogle-perftools-dev
+        - lua5.1
+        - liblua5.1-0
+        - liblua5.1-0-dev
+        - checkinstall
+
+    - name: Creating master folder
+      sudo: yes
+      file: path={{ masterfolder }} state=directory mode=0777
+    
+# get sources
+    - name: get sources luajit-2.0
+      git: repo=http://luajit.org/git/luajit-2.0.git dest={{ masterfolder }}/luajit-2.0
+    - name: get sources ngx_devel_kit
+      git: repo=https://github.com/simpl/ngx_devel_kit.git dest={{ masterfolder }}/ngx_devel_kit
+    - name: get sources lua-nginx-module
+      git: repo=https://github.com/openresty/lua-nginx-module.git dest={{ masterfolder }}/lua-nginx-module
+    - name: get sources echo-nginx-module
+      git: repo=https://github.com/openresty/echo-nginx-module.git dest={{ masterfolder }}/echo-nginx-module
+    - name: get sources nginx-rtmp-module
+      git: repo=https://github.com/arut/nginx-rtmp-module.git dest={{ masterfolder }}/nginx-rtmp-module
+    - name: get sources nginx-{{ ngxver }}
+      get_url: url=http://nginx.org/download/nginx-{{ ngxver }}.tar.gz dest={{ masterfolder }}/nginx-{{ ngxver }}.tar.gz
+
+# Build luajit
+    - name: Build luajit-2.0
+      sudo: yes
+      shell: "{{ item }}"
+      args:
+         chdir: "{{ masterfolder }}/luajit-2.0"
+      with_items:
+          - make -j8
+          - checkinstall --pkgname=luajit-2.0 --pkgversion="2.0.$(date +%Y%m%d%H%M)-tarbz2" --backup=no --deldoc=yes --fstrans=no --default
+#          - make distclean
+
+# nginx-{{ ngxver }}
+    - name: unarchive nginx-{{ ngxver }}
+      sudo: yes
+      unarchive: src={{ masterfolder }}/nginx-{{ ngxver }}.tar.gz dest={{ masterfolder }} copy=no
+
+    - name: Build fdk-aac
+      sudo: yes
+      shell: "{{ item }}"
+      args:
+         chdir: "{{ masterfolder }}/nginx-{{ ngxver }}"
+      with_items:
+          - export LUAJIT_LIB=/usr/local/lib
+          - export LUAJIT_INC=/usr/local/include/luajit-2.0
+          - ./configure --with-http_xslt_module --with-http_ssl_module --with-http_mp4_module --with-http_flv_module --with-http_secure_link_module --with-http_dav_module --with-http_geoip_module --with-http_image_filter_module --with-mail --with-mail_ssl_module --with-google_perftools_module --with-debug --with-pcre-jit --with-ipv6 --with-http_stub_status_module --with-http_realip_module --with-http_addition_module --with-http_gzip_static_module --with-http_sub_module --add-module={{ masterfolder }}/nginx-rtmp-module --add-module={{ masterfolder }}/ngx_devel_kit --add-module={{ masterfolder }}/lua-nginx-module --add-module={{ masterfolder }}/echo-nginx-module 
+          - make -j8
+          - checkinstall --pkgname=nginx --pkgversion="{{ ngxver }}$(date +%Y%m%d%H%M)-git" --backup=no --deldoc=yes --fstrans=no --default
+#          - make distclean
+
+# cfg
+    - name: get config
+      get_url: url=http://dburianov.pp.ua/wp-content/uploads/2014/04/cfg.zip dest={{ masterfolder }}/cfg.zip
+    - name: unarchive cfg
+      sudo: yes
+      unarchive: src={{ masterfolder }}/cfg.zip dest={{ masterfolder }} copy=no
+    - name: copy cfg
+      sudo: yes
+      shell: cp {{ masterfolder }}/nginx.conf {{ masterfolder }}/mime.types /usr/local/nginx/conf/
+    - name: copy statistic
+      sudo: yes
+      shell: cp {{ masterfolder }}/stat.xsl {{ masterfolder }}/nclients.xsl /usr/local/nginx/html/
+
+# run nginx
+    - name: run nginx
+      sudo: yes
+      shell: /usr/local/nginx/sbin/nginx
+
+
+
+
+
+
